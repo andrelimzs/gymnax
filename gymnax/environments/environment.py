@@ -15,6 +15,7 @@ TEnvParams = TypeVar("TEnvParams", bound="EnvParams")
 @struct.dataclass
 class EnvState:
     time: int
+    global_step: int
 
 
 @struct.dataclass
@@ -43,7 +44,7 @@ class Environment(Generic[TEnvState, TEnvParams]):  # object):
             params = self.default_params
         key, key_reset = jax.random.split(key)
         obs_st, state_st, reward, done, info = self.step_env(key, state, action, params)
-        obs_re, state_re = self.reset_env(key_reset, params)
+        obs_re, state_re = self.reset_env(key_reset, params, state.global_step)
         # Auto-reset environment based on termination
         state = jax.tree_map(
             lambda x, y: jax.lax.select(done, x, y), state_re, state_st
@@ -53,13 +54,16 @@ class Environment(Generic[TEnvState, TEnvParams]):  # object):
 
     @functools.partial(jax.jit, static_argnums=(0,))
     def reset(
-        self, key: chex.PRNGKey, params: Optional[TEnvParams] = None
+        self,
+        key: chex.PRNGKey,
+        params: Optional[TEnvParams] = None,
+        global_step: int = 0,
     ) -> Tuple[chex.Array, TEnvState]:
         """Performs resetting of environment."""
         # Use default env parameters if no others specified
         if params is None:
             params = self.default_params
-        obs, state = self.reset_env(key, params)
+        obs, state = self.reset_env(key, params, global_step)
         return obs, state
 
     def step_env(
@@ -73,7 +77,7 @@ class Environment(Generic[TEnvState, TEnvParams]):  # object):
         raise NotImplementedError
 
     def reset_env(
-        self, key: chex.PRNGKey, params: TEnvParams
+        self, key: chex.PRNGKey, params: TEnvParams, global_step: int,
     ) -> Tuple[chex.Array, TEnvState]:
         """Environment-specific reset."""
         raise NotImplementedError
