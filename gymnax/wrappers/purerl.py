@@ -81,9 +81,9 @@ class LogWrapper(GymnaxWrapper):
     def reset(
         self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
     ) -> Tuple[chex.Array, LogEnvState]:
-        obs, env_state = self._env.reset(key, params)
+        obs, env_state, params = self._env.reset(key, params)
         state = LogEnvState(env_state, 0, 0, 0, 0)
-        return obs, state
+        return obs, state, params
 
     @functools.partial(jax.jit, static_argnums=(0,))
     def step(
@@ -106,7 +106,7 @@ class LogWrapper(GymnaxWrapper):
         Returns:
           A tuple of (observation, state, reward, done, info).
         """
-        obs, env_state, reward, done, info = self._env.step(
+        obs, env_state, reward, done, info, params = self._env.step(
             key, state.env_state, action, params
         )
         new_episode_return = state.episode_returns + reward
@@ -123,4 +123,4 @@ class LogWrapper(GymnaxWrapper):
         info["returned_episode_returns"] = state.returned_episode_returns
         info["returned_episode_lengths"] = state.returned_episode_lengths
         info["returned_episode"] = done
-        return obs, state, reward, done, info
+        return obs, state, reward, done, info, params

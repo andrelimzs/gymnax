@@ -14,9 +14,8 @@ TEnvParams = TypeVar("TEnvParams", bound="EnvParams")
 
 @struct.dataclass
 class EnvState:
-    time: int
     global_step: int
-
+    time: int
 
 @struct.dataclass
 class EnvParams:
@@ -26,8 +25,8 @@ class EnvParams:
 class Environment(Generic[TEnvState, TEnvParams]):  # object):
     """Jittable abstract base class for all gymnax Environments."""
 
-    @property
-    def default_params(self) -> EnvParams:
+    # @property
+    def default_params(self, **kwargs) -> EnvParams:
         return EnvParams()
 
     @functools.partial(jax.jit, static_argnums=(0,))
@@ -43,14 +42,14 @@ class Environment(Generic[TEnvState, TEnvParams]):  # object):
         if params is None:
             params = self.default_params
         key, key_reset = jax.random.split(key)
-        obs_st, state_st, reward, done, info = self.step_env(key, state, action, params)
-        obs_re, state_re = self.reset_env(key_reset, params, state.global_step)
+        obs_st, state_st, reward, done, info, params = self.step_env(key, state, action, params)
+        obs_re, state_re, params = self.reset_env(key_reset, params, state.global_step)
         # Auto-reset environment based on termination
         state = jax.tree_map(
             lambda x, y: jax.lax.select(done, x, y), state_re, state_st
         )
         obs = jax.lax.select(done, obs_re, obs_st)
-        return obs, state, reward, done, info
+        return obs, state, reward, done, info, params
 
     @functools.partial(jax.jit, static_argnums=(0,))
     def reset(
@@ -63,8 +62,8 @@ class Environment(Generic[TEnvState, TEnvParams]):  # object):
         # Use default env parameters if no others specified
         if params is None:
             params = self.default_params
-        obs, state = self.reset_env(key, params, global_step)
-        return obs, state
+        obs, state, params = self.reset_env(key, params, global_step)
+        return obs, state, params
 
     def step_env(
         self,
